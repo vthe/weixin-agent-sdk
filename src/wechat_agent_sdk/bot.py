@@ -58,6 +58,7 @@ async def login(opts: Optional[LoginOptions] = None) -> str:
     try:
         import qrcode
         import tempfile
+        import sys
 
         qr_url = start_result.qrcodeUrl
         img = qrcode.make(qr_url)
@@ -66,7 +67,13 @@ async def login(opts: Optional[LoginOptions] = None) -> str:
         img.save(temp_file)
 
         log_fn(f"二维码已保存到: {temp_file}")
-        subprocess.run(["open", temp_file], check=True)
+
+        if sys.platform == "darwin":
+            subprocess.run(["open", temp_file], check=True)
+        elif sys.platform == "win32":
+            os.startfile(temp_file)
+        else:
+            subprocess.run(["xdg-open", temp_file], check=True)
     except Exception as e:
         log_fn(f"无法显示二维码: {e}")
         log_fn(f"二维码链接: {start_result.qrcodeUrl}")
