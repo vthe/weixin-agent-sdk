@@ -56,29 +56,26 @@ async def login(opts: Optional[LoginOptions] = None) -> str:
     log_fn("\n使用微信扫描以下二维码，以完成连接：\n")
 
     try:
-        import qrcode
         import tempfile
         import sys
 
         qr_url = start_result.qrcodeUrl
-        img = qrcode.make(qr_url)
 
-        ascii_str = ""
-        pixels = img.load()
-        width, height = img.size
-        for y in range(height):
-            for x in range(width):
-                if pixels[x, y]:
-                    ascii_str += "██"
-                else:
-                    ascii_str += "  "
-            ascii_str += "\n"
-
-        log_fn(ascii_str)
+        try:
+            from qrcode_terminal import qr
+            qr(qr_url)
+            log_fn("\n请使用微信扫描上方二维码")
+        except Exception:
+            import qrcode
+            img = qrcode.make(qr_url)
+            img.save(os.path.join(tempfile.gettempdir(), "weixin_qrcode.png"))
+            log_fn(f"请使用微信扫描二维码: {qr_url}")
 
         temp_file = os.path.join(tempfile.gettempdir(), "weixin_qrcode.png")
+        import qrcode
+        img = qrcode.make(qr_url)
         img.save(temp_file)
-        log_fn(f"\n二维码已保存到: {temp_file}")
+        log_fn(f"二维码已保存到: {temp_file}")
 
         if sys.platform == "darwin":
             subprocess.run(["open", temp_file], check=True)

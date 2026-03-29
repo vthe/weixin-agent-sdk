@@ -9,6 +9,9 @@ description = "WeChat AI Agent Bridge SDK - Connect any AI backend to WeChat"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
+dependencies = [
+    "qrcode-terminal>=0.12.0",
+]
 authors = [
     {name = "Your Name", email = "your.email@example.com"}
 ]
