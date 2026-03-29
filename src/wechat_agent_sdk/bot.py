@@ -63,10 +63,22 @@ async def login(opts: Optional[LoginOptions] = None) -> str:
         qr_url = start_result.qrcodeUrl
         img = qrcode.make(qr_url)
 
+        ascii_str = ""
+        pixels = img.load()
+        width, height = img.size
+        for y in range(height):
+            for x in range(width):
+                if pixels[x, y]:
+                    ascii_str += "██"
+                else:
+                    ascii_str += "  "
+            ascii_str += "\n"
+
+        log_fn(ascii_str)
+
         temp_file = os.path.join(tempfile.gettempdir(), "weixin_qrcode.png")
         img.save(temp_file)
-
-        log_fn(f"二维码已保存到: {temp_file}")
+        log_fn(f"\n二维码已保存到: {temp_file}")
 
         if sys.platform == "darwin":
             subprocess.run(["open", temp_file], check=True)
