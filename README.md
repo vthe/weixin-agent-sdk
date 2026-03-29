@@ -1,8 +1,8 @@
 # WeChat Agent SDK
 
-A Python SDK for building WeChat bots with AI agent integration.
+> **免责声明**: 本项目非微信官方项目，代码由 [@tencent-weixin/openclaw-weixin](https://github.com/tencent-weixin/openclaw-weixin) 改造而来，仅供学习交流使用。
 
-> **Note**: This project is a Python version derived from [wong2/weixin-agent-sdk](https://github.com/wong2/weixin-agent-sdk).
+微信 AI Agent 桥接框架 —— 通过简单的 Agent 接口，将任意 AI 后端接入微信。
 
 ## Installation (Local Development)
 
@@ -14,8 +14,8 @@ pip install -e .
 Or install from source:
 
 ```bash
-git clone https://github.com/yourusername/wechat-agent-sdk.git
-cd wechat-agent-sdk
+git clone https://github.com/vthe/weixin-agent-sdk.git
+cd weixin-agent-sdk
 pip install -e .
 ```
 
