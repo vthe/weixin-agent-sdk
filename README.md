@@ -2,6 +2,8 @@
 
 > **免责声明**: 本项目非微信官方项目，代码由 [@tencent-weixin/openclaw-weixin](https://github.com/tencent-weixin/openclaw-weixin) 改造而来，仅供学习交流使用。
 
+> **Python 版本**: 本项目是 [wong2/weixin-agent-sdk](https://github.com/wong2/weixin-agent-sdk) 的 Python 实现。
+
 微信 AI Agent 桥接框架 —— 通过简单的 Agent 接口，将任意 AI 后端接入微信。
 
 ## Installation (Local Development)
