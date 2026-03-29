@@ -60,38 +60,27 @@ async def login(opts: Optional[LoginOptions] = None) -> str:
         import sys
 
         qr_url = start_result.qrcodeUrl
-        log_fn(f"[DEBUG] QR URL: {qr_url}")
+        temp_file = os.path.join(tempfile.gettempdir(), "weixin_qrcode.png")
 
         try:
-            from qrcode_terminal import qr
-            log_fn("[DEBUG] Using qrcode_terminal")
-            qr(qr_url)
-            log_fn("\n请使用微信扫描上方二维码")
-        except ImportError as ie:
-            log_fn(f"[DEBUG] qrcode_terminal not found: {ie}")
             import qrcode
             img = qrcode.make(qr_url)
-            img.save(os.path.join(tempfile.gettempdir(), "weixin_qrcode.png"))
-            log_fn(f"请使用微信扫描二维码: {qr_url}")
-        except Exception as ge:
-            log_fn(f"[DEBUG] qrcode_terminal error: {ge}")
-            import qrcode
-            img = qrcode.make(qr_url)
-            img.save(os.path.join(tempfile.gettempdir(), "weixin_qrcode.png"))
-            log_fn(f"请使用微信扫描二维码: {qr_url}")
+            img.save(temp_file)
+            log_fn(f"\n请使用微信扫描二维码图片: {temp_file}")
+        except Exception as e:
+            log_fn(f"无法生成二维码图片: {e}")
+            log_fn(f"请复制以下链接到微信中打开:")
+            log_fn(qr_url)
 
-        temp_file = os.path.join(tempfile.gettempdir(), "weixin_qrcode.png")
-        import qrcode
-        img = qrcode.make(qr_url)
-        img.save(temp_file)
-        log_fn(f"二维码已保存到: {temp_file}")
-
-        if sys.platform == "darwin":
-            subprocess.run(["open", temp_file], check=True)
-        elif sys.platform == "win32":
-            os.startfile(temp_file)
-        else:
-            subprocess.run(["xdg-open", temp_file], check=True)
+        try:
+            if sys.platform == "darwin":
+                subprocess.run(["open", temp_file], check=True)
+            elif sys.platform == "win32":
+                os.startfile(temp_file)
+            else:
+                subprocess.run(["xdg-open", temp_file], check=True)
+        except Exception:
+            pass
     except Exception as e:
         log_fn(f"无法显示二维码: {e}")
         log_fn(f"二维码链接: {start_result.qrcodeUrl}")
