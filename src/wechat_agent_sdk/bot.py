@@ -60,12 +60,21 @@ async def login(opts: Optional[LoginOptions] = None) -> str:
         import sys
 
         qr_url = start_result.qrcodeUrl
+        log_fn(f"[DEBUG] QR URL: {qr_url}")
 
         try:
             from qrcode_terminal import qr
+            log_fn("[DEBUG] Using qrcode_terminal")
             qr(qr_url)
             log_fn("\n请使用微信扫描上方二维码")
-        except Exception:
+        except ImportError as ie:
+            log_fn(f"[DEBUG] qrcode_terminal not found: {ie}")
+            import qrcode
+            img = qrcode.make(qr_url)
+            img.save(os.path.join(tempfile.gettempdir(), "weixin_qrcode.png"))
+            log_fn(f"请使用微信扫描二维码: {qr_url}")
+        except Exception as ge:
+            log_fn(f"[DEBUG] qrcode_terminal error: {ge}")
             import qrcode
             img = qrcode.make(qr_url)
             img.save(os.path.join(tempfile.gettempdir(), "weixin_qrcode.png"))
