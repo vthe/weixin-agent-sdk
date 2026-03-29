@@ -63,35 +63,25 @@ async def login(opts: Optional[LoginOptions] = None) -> str:
         qr_url = start_result.qrcodeUrl
         img = qrcode.make(qr_url)
 
-        pixels = img.load()
-        width, height = img.size
-        block = "██" if sys.platform != "win32" else "##"
-        space = "  " if sys.platform != "win32" else "  "
-
-        log_fn("\n使用微信扫描以下二维码：\n")
-        for y in range(height):
-            row = ""
-            for x in range(width):
-                if pixels[x, y]:
-                    row += block
-                else:
-                    row += space
-            log_fn(row)
-        log_fn("\n")
-
         temp_file = os.path.join(tempfile.gettempdir(), "weixin_qrcode.png")
         img.save(temp_file)
-        log_fn(f"二维码已保存到: {temp_file}")
 
-        if sys.platform == "darwin":
-            subprocess.run(["open", temp_file], check=True)
-        elif sys.platform == "win32":
-            os.startfile(temp_file)
-        else:
-            subprocess.run(["xdg-open", temp_file], check=True)
+        log_fn("\n请使用微信扫码登录：")
+        log_fn(f"\n链接: {qr_url}")
+        log_fn(f"\n二维码图片: {temp_file}")
+
+        try:
+            if sys.platform == "darwin":
+                subprocess.run(["open", temp_file], check=True)
+            elif sys.platform == "win32":
+                os.startfile(temp_file)
+            else:
+                subprocess.run(["xdg-open", temp_file], check=True)
+        except Exception:
+            pass
+
     except Exception as e:
-        log_fn(f"无法显示二维码: {e}")
-        log_fn(f"二维码链接: {start_result.qrcodeUrl}")
+        log_fn(f"无法生成二维码: {e}")
 
     log_fn("\n等待扫码...\n")
 
