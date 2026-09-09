@@ -103,17 +103,35 @@ async def fetch_cdn_bytes(url: str) -> bytes:
         return response.content
 
 
+def resolve_media_ref(media: object) -> tuple[str | None, str | None]:
+    """Return (full_url, encrypt_query_param) from a media dict, or (None, None)."""
+    if not isinstance(media, dict):
+        return None, None
+    full_url = media.get("full_url")
+    full_url = full_url if isinstance(full_url, str) and full_url else None
+    encrypt_query_param = media.get("encrypt_query_param")
+    encrypt_query_param = encrypt_query_param if isinstance(encrypt_query_param, str) and encrypt_query_param else None
+    return full_url, encrypt_query_param
+
+
 async def download_and_decrypt_buffer(
     encrypted_query_param: str,
     aes_key_base64: str,
     cdn_base_url: str,
+    full_url: str | None = None,
 ) -> bytes:
-    encrypted = await fetch_cdn_bytes(build_cdn_download_url(encrypted_query_param, cdn_base_url))
+    url = full_url or build_cdn_download_url(encrypted_query_param, cdn_base_url)
+    encrypted = await fetch_cdn_bytes(url)
     return decrypt_aes_ecb(encrypted, parse_aes_key(aes_key_base64))
 
 
-async def download_plain_cdn_buffer(encrypted_query_param: str, cdn_base_url: str) -> bytes:
-    return await fetch_cdn_bytes(build_cdn_download_url(encrypted_query_param, cdn_base_url))
+async def download_plain_cdn_buffer(
+    encrypted_query_param: str,
+    cdn_base_url: str,
+    full_url: str | None = None,
+) -> bytes:
+    url = full_url or build_cdn_download_url(encrypted_query_param, cdn_base_url)
+    return await fetch_cdn_bytes(url)
 
 
 async def save_media_buffer(
@@ -152,28 +170,31 @@ async def download_media_from_item(
     cdn_base_url: str,
 ) -> tuple[Path, str, str | None] | None:
     item_type = item.get("type")
+
     if item_type == MESSAGE_ITEM_IMAGE:
         image_item = item.get("image_item")
         if not isinstance(image_item, dict):
             return None
         media = image_item.get("media")
-        if not isinstance(media, dict):
-            return None
-        encrypted_query_param = media.get("encrypt_query_param")
-        if not isinstance(encrypted_query_param, str) or not encrypted_query_param:
+        full_url, encrypted_query_param = resolve_media_ref(media)
+        if not full_url and not encrypted_query_param:
             return None
         aes_key = None
         raw_hex_key = image_item.get("aeskey")
         if isinstance(raw_hex_key, str) and raw_hex_key:
             aes_key = base64.b64encode(bytes.fromhex(raw_hex_key)).decode()
         else:
-            candidate = media.get("aes_key")
+            candidate = media.get("aes_key") if isinstance(media, dict) else None
             if isinstance(candidate, str) and candidate:
                 aes_key = candidate
         buffer = (
-            await download_and_decrypt_buffer(encrypted_query_param, aes_key, cdn_base_url)
+            await download_and_decrypt_buffer(
+                encrypted_query_param or "", aes_key, cdn_base_url, full_url=full_url
+            )
             if aes_key
-            else await download_plain_cdn_buffer(encrypted_query_param, cdn_base_url)
+            else await download_plain_cdn_buffer(
+                encrypted_query_param or "", cdn_base_url, full_url=full_url
+            )
         )
         path = await save_media_buffer(buffer, subdir="inbound")
         return path, "image/*", None
@@ -183,13 +204,13 @@ async def download_media_from_item(
         if not isinstance(voice_item, dict):
             return None
         media = voice_item.get("media")
-        if not isinstance(media, dict):
+        full_url, encrypted_query_param = resolve_media_ref(media)
+        aes_key = media.get("aes_key") if isinstance(media, dict) else None
+        if (not full_url and not encrypted_query_param) or not isinstance(aes_key, str) or not aes_key:
             return None
-        encrypted_query_param = media.get("encrypt_query_param")
-        aes_key = media.get("aes_key")
-        if not isinstance(encrypted_query_param, str) or not isinstance(aes_key, str):
-            return None
-        buffer = await download_and_decrypt_buffer(encrypted_query_param, aes_key, cdn_base_url)
+        buffer = await download_and_decrypt_buffer(
+            encrypted_query_param or "", aes_key, cdn_base_url, full_url=full_url
+        )
         path = await save_media_buffer(
             buffer,
             content_type="audio/silk",
@@ -203,14 +224,14 @@ async def download_media_from_item(
         if not isinstance(file_item, dict):
             return None
         media = file_item.get("media")
-        if not isinstance(media, dict):
-            return None
-        encrypted_query_param = media.get("encrypt_query_param")
-        aes_key = media.get("aes_key")
+        full_url, encrypted_query_param = resolve_media_ref(media)
+        aes_key = media.get("aes_key") if isinstance(media, dict) else None
         file_name = file_item.get("file_name")
-        if not isinstance(encrypted_query_param, str) or not isinstance(aes_key, str):
+        if (not full_url and not encrypted_query_param) or not isinstance(aes_key, str) or not aes_key:
             return None
-        buffer = await download_and_decrypt_buffer(encrypted_query_param, aes_key, cdn_base_url)
+        buffer = await download_and_decrypt_buffer(
+            encrypted_query_param or "", aes_key, cdn_base_url, full_url=full_url
+        )
         mime_type = (
             get_mime_from_filename(file_name)
             if isinstance(file_name, str)
@@ -229,13 +250,13 @@ async def download_media_from_item(
         if not isinstance(video_item, dict):
             return None
         media = video_item.get("media")
-        if not isinstance(media, dict):
+        full_url, encrypted_query_param = resolve_media_ref(media)
+        aes_key = media.get("aes_key") if isinstance(media, dict) else None
+        if (not full_url and not encrypted_query_param) or not isinstance(aes_key, str) or not aes_key:
             return None
-        encrypted_query_param = media.get("encrypt_query_param")
-        aes_key = media.get("aes_key")
-        if not isinstance(encrypted_query_param, str) or not isinstance(aes_key, str):
-            return None
-        buffer = await download_and_decrypt_buffer(encrypted_query_param, aes_key, cdn_base_url)
+        buffer = await download_and_decrypt_buffer(
+            encrypted_query_param or "", aes_key, cdn_base_url, full_url=full_url
+        )
         path = await save_media_buffer(
             buffer,
             content_type="video/mp4",
@@ -250,16 +271,18 @@ async def download_media_from_item(
 async def upload_buffer_to_cdn(
     *,
     buffer: bytes,
-    upload_param: str,
+    upload_param: str | None,
     filekey: str,
     cdn_base_url: str,
     aes_key: bytes,
+    upload_full_url: str | None = None,
 ) -> str:
     ciphertext = encrypt_aes_ecb(buffer, aes_key)
+    url = upload_full_url or build_cdn_upload_url(cdn_base_url, upload_param or "", filekey)
     async with httpx.AsyncClient(follow_redirects=True) as client:
         for attempt in range(3):
             response = await client.post(
-                build_cdn_upload_url(cdn_base_url, upload_param, filekey),
+                url,
                 content=ciphertext,
                 headers={"Content-Type": "application/octet-stream"},
             )
@@ -305,8 +328,11 @@ async def upload_media_to_weixin(
         account_id=account_id,
     )
     upload_param = upload_url.get("upload_param")
-    if not isinstance(upload_param, str) or not upload_param:
-        raise ValueError("getUploadUrl returned no upload_param")
+    upload_full_url = upload_url.get("upload_full_url")
+    upload_param = upload_param if isinstance(upload_param, str) and upload_param else None
+    upload_full_url = upload_full_url if isinstance(upload_full_url, str) and upload_full_url else None
+    if not upload_param and not upload_full_url:
+        raise ValueError("getUploadUrl returned no upload URL (need upload_full_url or upload_param)")
 
     download_param = await upload_buffer_to_cdn(
         buffer=plaintext,
@@ -314,6 +340,7 @@ async def upload_media_to_weixin(
         filekey=filekey,
         cdn_base_url=cdn_base_url,
         aes_key=aes_key,
+        upload_full_url=upload_full_url,
     )
     return UploadedFileInfo(
         filekey=filekey,

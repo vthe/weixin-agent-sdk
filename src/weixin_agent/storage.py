@@ -76,6 +76,19 @@ def register_account_id(account_id: str) -> None:
     (state_dir / "accounts.json").write_text(json.dumps(account_ids, indent=2))
 
 
+def list_account_tokens(limit: int = 10) -> list[str]:
+    account_ids = list_account_ids()
+    tokens: list[str] = []
+    for account_id in reversed(account_ids):
+        if len(tokens) >= limit:
+            break
+        data = load_account(account_id)
+        token = (data.token or "").strip() if data else ""
+        if token:
+            tokens.append(token)
+    return tokens
+
+
 def resolve_accounts_dir() -> Path:
     return resolve_weixin_state_dir() / "accounts"
 
@@ -163,6 +176,27 @@ def load_config_route_tag(account_id: str | None = None) -> str | None:
     route_tag = section.get("routeTag")
     if isinstance(route_tag, (str, int)) and str(route_tag).strip():
         return str(route_tag).strip()
+    return None
+
+
+def load_config_bot_agent() -> str | None:
+    try:
+        config = json.loads(resolve_config_path().read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+    if not isinstance(config, dict):
+        return None
+    channels = config.get("channels")
+    if not isinstance(channels, dict):
+        return None
+    section = channels.get(CHANNEL_KEY)
+    if not isinstance(section, dict):
+        return None
+
+    bot_agent = section.get("botAgent")
+    if isinstance(bot_agent, str) and bot_agent.strip():
+        return bot_agent.strip()
     return None
 
 

@@ -19,6 +19,7 @@ from weixin_agent.media import (
     upload_media_to_weixin,
 )
 from weixin_agent.models import Agent, ChatRequest, ChatResponse, IncomingMedia
+from weixin_agent.session import remember_context_token
 from weixin_agent.storage import (
     ResolvedWeixinAccount,
     load_get_updates_buf,
@@ -367,6 +368,8 @@ async def process_message(
         return
     if not isinstance(context_token, str) or not context_token:
         return
+
+    remember_context_token(to_user_id, context_token)
 
     text_body = extract_text_body(items)
     if text_body.startswith("/"):

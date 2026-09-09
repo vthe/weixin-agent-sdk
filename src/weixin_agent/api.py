@@ -8,21 +8,53 @@ from typing import Any
 
 import httpx
 
-from weixin_agent.storage import load_config_route_tag
+from weixin_agent.storage import (
+    load_config_bot_agent,
+    load_config_route_tag,
+    list_account_tokens,
+)
 
 DEFAULT_LONG_POLL_TIMEOUT_S = 35.0
 DEFAULT_API_TIMEOUT_S = 15.0
 DEFAULT_CONFIG_TIMEOUT_S = 10.0
 DEFAULT_ILINK_BOT_TYPE = "3"
 SESSION_EXPIRED_ERRCODE = -14
+DEFAULT_BOT_AGENT = "OpenClaw"
+
+try:
+    PACKAGE_VERSION = version("weixin-agent-sdk")
+except PackageNotFoundError:
+    PACKAGE_VERSION = "0.1.0"
+
+
+def build_client_version(version_string: str) -> int:
+    parts = version_string.split(".")
+    values = [0, 0, 0]
+    for i, part in enumerate(parts[:3]):
+        try:
+            values[i] = int(part)
+        except ValueError:
+            pass
+    return ((values[0] & 0xFF) << 16) | ((values[1] & 0xFF) << 8) | (values[2] & 0xFF)
+
+
+# iLink-App-Id / iLink-App-ClientVersion: mirrors package.json ilink_appid + version.
+ILINK_APP_ID = "bot"
+ILINK_APP_CLIENT_VERSION = str(build_client_version(PACKAGE_VERSION))
 
 
 def build_base_info() -> dict[str, str]:
-    try:
-        package_version = version("weixin-agent-sdk")
-    except PackageNotFoundError:
-        package_version = "0.1.0"
-    return {"channel_version": package_version}
+    return {
+        "channel_version": PACKAGE_VERSION,
+        "bot_agent": load_config_bot_agent() or DEFAULT_BOT_AGENT,
+    }
+
+
+def build_common_headers() -> dict[str, str]:
+    return {
+        "iLink-App-Id": ILINK_APP_ID,
+        "iLink-App-ClientVersion": ILINK_APP_CLIENT_VERSION,
+    }
 
 
 def random_wechat_uin() -> str:
@@ -45,6 +77,7 @@ class WeixinApiClient:
             "AuthorizationType": "ilink_bot_token",
             "Content-Length": str(len(body.encode())),
             "X-WECHAT-UIN": random_wechat_uin(),
+            **build_common_headers(),
         }
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
@@ -79,19 +112,30 @@ class WeixinApiClient:
         timeout: float,
         headers: dict[str, str] | None = None,
         account_id: str | None = None,
+        base_url: str | None = None,
     ) -> dict[str, Any]:
-        merged_headers = headers.copy() if headers else {}
+        merged_headers = build_common_headers()
+        if headers:
+            merged_headers.update(headers)
         route_tag = load_config_route_tag(account_id)
         if route_tag:
             merged_headers["SKRouteTag"] = route_tag
-        response = await self._client.get(
-            endpoint,
-            params=params,
-            headers=merged_headers or None,
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        return response.json()
+
+        client = self._client
+        if base_url and base_url.rstrip("/") != self.base_url.rstrip("/"):
+            client = httpx.AsyncClient(base_url=base_url.rstrip("/") + "/", follow_redirects=True)
+        try:
+            response = await client.get(
+                endpoint,
+                params=params,
+                headers=merged_headers or None,
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        finally:
+            if client is not self._client:
+                await client.aclose()
 
     async def get_updates(
         self,
@@ -166,9 +210,9 @@ class WeixinApiClient:
         bot_type: str = DEFAULT_ILINK_BOT_TYPE,
         account_id: str | None = None,
     ) -> dict[str, Any]:
-        return await self._get_json(
-            "ilink/bot/get_bot_qrcode",
-            params={"bot_type": bot_type},
+        return await self._post_json(
+            f"ilink/bot/get_bot_qrcode?bot_type={bot_type}",
+            {"local_token_list": list_account_tokens()},
             timeout=DEFAULT_API_TIMEOUT_S,
             account_id=account_id,
         )
@@ -177,15 +221,20 @@ class WeixinApiClient:
         self,
         *,
         qrcode: str,
+        verify_code: str | None = None,
+        base_url: str | None = None,
         account_id: str | None = None,
     ) -> dict[str, Any]:
         try:
+            params: dict[str, Any] = {"qrcode": qrcode}
+            if verify_code:
+                params["verify_code"] = verify_code
             return await self._get_json(
                 "ilink/bot/get_qrcode_status",
-                params={"qrcode": qrcode},
-                headers={"iLink-App-ClientVersion": "1"},
+                params=params,
                 timeout=DEFAULT_LONG_POLL_TIMEOUT_S,
                 account_id=account_id,
+                base_url=base_url,
             )
         except httpx.TimeoutException:
             return {"status": "wait"}

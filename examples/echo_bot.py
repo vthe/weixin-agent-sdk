@@ -8,7 +8,7 @@ from weixin_agent import Agent, ChatRequest, ChatResponse, login, start
 
 class EchoAgent(Agent):
     async def chat(self, request: ChatRequest) -> ChatResponse:
-        return ChatResponse(text=f"You said: {request.text}")
+        return ChatResponse(text=f"You said: {request.text}" + '\r\n'+'aaa')
 
 
 async def main() -> None:
